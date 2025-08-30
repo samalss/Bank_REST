@@ -1,1 +1,632 @@
-# Здесь будет OpenAPI описание всех доступных эндпоинтов и моделей данных.
+openapi: 3.0.3
+info:
+  title: Bank Cards API
+  version: 1.0.0
+  description: API для управления банковскими картами.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Пользователь успешно зарегистрирован
+        '400':
+          description: Некорректные данные или имя пользователя уже занято
+      security:
+        - {}
+  /api/auth/login:
+    post:
+      summary: Аутентификация пользователя и получение токенов
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponse'
+        '401':
+          description: Неверные учетные данные или пользователь неактивен
+      security:
+        - {}
+  /api/auth/refresh:
+    post:
+      summary: Обновление токена доступа с помощью токена обновления
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzUxMiJ9..."
+      responses:
+        '200':
+          description: Токен доступа успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponse'
+        '401':
+          description: Невалидный или просроченный токен обновления
+
+  /api/cards:
+    get:
+      summary: Просмотр своих карт (для USER)
+      tags:
+        - Пользовательские карты
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, example: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, example: 10 }
+        - name: sort
+          in: query
+          schema: { type: string, example: "balance,desc" }
+      responses:
+        '200':
+          description: Успешный просмотр карт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCardResponse'
+        '403':
+          description: Доступ запрещен
+      security:
+        - bearerAuth: []
+    post:
+      summary: Создание новой карты (для USER)
+      tags:
+        - Пользовательские карты
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: Карта успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '403':
+          description: Доступ запрещен
+      security:
+        - bearerAuth: []
+
+  /api/cards/{id}:
+    get:
+      summary: Просмотр карты по ID (для USER)
+      tags:
+        - Пользовательские карты
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Информация о карте
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '403':
+          description: Доступ запрещен (карта принадлежит другому пользователю)
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Удаление своей карты (для USER)
+      tags:
+        - Пользовательские карты
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Карта успешно удалена
+        '400':
+          description: Невозможно удалить карту с ненулевым балансом
+        '403':
+          description: Доступ запрещен (попытка удалить чужую карту)
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/cards/{id}/block:
+    patch:
+      summary: Блокировка своей карты (для USER)
+      tags:
+        - Пользовательские карты
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Карта успешно заблокирована
+        '400':
+          description: Карта уже неактивна или просрочена
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/cards/transfer:
+    post:
+      summary: Перевод средств между своими картами (для USER)
+      tags:
+        - Пользовательские карты
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '200':
+          description: Перевод успешно выполнен
+        '400':
+          description: Недостаточно средств, неактивная карта или некорректная сумма
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/admin/cards:
+    get:
+      summary: Просмотр всех карт в системе (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, example: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, example: 10 }
+        - name: sort
+          in: query
+          schema: { type: string, example: "balance,desc" }
+      responses:
+        '200':
+          description: Успешный просмотр всех карт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCardResponse'
+        '403':
+          description: Доступ запрещен
+      security:
+        - bearerAuth: []
+
+  /api/admin/cards/{id}:
+    delete:
+      summary: Удаление карты по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Карта успешно удалена
+        '400':
+          description: Невозможно удалить карту с ненулевым балансом
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/admin/cards/{id}/block:
+    post:
+      summary: Блокировка карты по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Карта успешно заблокирована
+        '400':
+          description: Карта уже неактивна или просрочена
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/admin/cards/{id}/activate:
+    post:
+      summary: Активация карты по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Карта успешно активирована
+        '400':
+          description: Карта уже активна или пользователь заблокирован
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Карта не найдена
+      security:
+        - bearerAuth: []
+
+  /api/admin/users:
+    get:
+      summary: Просмотр всех пользователей (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, example: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, example: 10 }
+        - name: sort
+          in: query
+          schema: { type: string, example: "username,asc" }
+      responses:
+        '200':
+          description: Успешный просмотр всех пользователей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUserResponse'
+        '403':
+          description: Доступ запрещен
+      security:
+        - bearerAuth: []
+
+  /api/admin/users/{userId}/cards:
+    get:
+      summary: Просмотр всех карт пользователя по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema: { type: integer, example: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, example: 10 }
+      responses:
+        '200':
+          description: Успешный просмотр карт пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCardResponse'
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Пользователь не найден
+      security:
+        - bearerAuth: []
+
+  /api/admin/users/{id}/block:
+    post:
+      summary: Блокировка пользователя по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Пользователь успешно заблокирован
+        '400':
+          description: Пользователь уже заблокирован
+        '403':
+          description: Доступ запрещен (попытка заблокировать свой аккаунт)
+        '404':
+          description: Пользователь не найден
+      security:
+        - bearerAuth: []
+
+  /api/admin/users/{id}/activate:
+    post:
+      summary: Активация пользователя по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Пользователь успешно активирован
+        '400':
+          description: Пользователь уже активен
+        '403':
+          description: Доступ запрещен
+        '404':
+          description: Пользователь не найден
+      security:
+        - bearerAuth: []
+
+  /api/admin/users/{id}:
+    delete:
+      summary: Удаление пользователя по ID (для ADMIN)
+      tags:
+        - Администратор
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Пользователь успешно удален
+        '403':
+          description: Доступ запрещен (попытка удалить свой аккаунт)
+        '404':
+          description: Пользователь не найден
+      security:
+        - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    CreateCardRequest:
+      type: object
+
+    TransferRequest:
+      type: object
+      required:
+        - sourceCardId
+        - destinationCardId
+        - amount
+      properties:
+        sourceCardId:
+          type: string
+          format: uuid
+        destinationCardId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+
+    JwtResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    Pageable:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        sort:
+          type: array
+          items:
+            type: string
+
+    PageCardResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardResponse'
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        last:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+        first:
+          type: boolean
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        numberOfElements:
+          type: integer
+        empty:
+          type: boolean
+
+    PageableObject:
+      type: object
+      properties:
+        paged:
+          type: boolean
+        unpaged:
+          type: boolean
+        pageNumber:
+          type: integer
+        pageSize:
+          type: integer
+        offset:
+          type: integer
+        sort:
+          $ref: '#/components/schemas/SortObject'
+
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+
+    PageUserResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        pageable:
+          $ref: '#/components/schemas/PageableObject'
+        last:
+          type: boolean
+        totalPages:
+          type: integer
+        totalElements:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+        first:
+          type: boolean
+        sort:
+          $ref: '#/components/schemas/SortObject'
+        numberOfElements:
+          type: integer
+        empty:
+          type: boolean
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, BLOCKED, DELETED]
+
+    CardResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cardNumberMasked:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [ACTIVE, BLOCKED, EXPIRED, DELETED]
+        balance:
+          type: number
+          format: double
+        owner:
+          $ref: '#/components/schemas/UserResponse'

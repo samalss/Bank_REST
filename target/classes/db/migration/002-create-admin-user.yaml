@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3
+      author: samal
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  value: 'a1b2c3d4-e5f6-7890-1234-567890abcdef'
+              - column:
+                  name: username
+                  value: 'admin'
+              - column:
+                  name: password
+                  value: '$2a$10$gB0XyXkuZ6w9AVhsDYHjaOuOpP899oEKi4pN1412Q7NJPhlpkoEQC' # "admin"
+              - column:
+                  name: role
+                  value: 'ADMIN'
+              - column:
+                  name: status
+                  value: 'ACTIVE'

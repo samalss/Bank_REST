@@ -1,9 +1,44 @@
-# 
-# docker-compose.yml — определяет сервисы для разработки и тестирования.
+version: '3.8'
 
-Что нужно сделать:
-  - Настроить сервисы для:
-      - PostgreSQL (или MySQL) с начальной базой.
-      - Приложения Spring Boot (если нужно).
-  - Открыть нужные порты (например, 5432, 8080).
-  - Настроить volume для хранения данных БД.
+services:
+  db:
+    image: mysql:8.0.33
+    container_name: mysql-db
+    environment:
+      MYSQL_DATABASE: 'bank_cards_db'
+      MYSQL_USER: 'springuser'
+      MYSQL_PASSWORD: 'springpassword'
+      MYSQL_ROOT_PASSWORD: 'root_password'
+    ports:
+      - '3306:3306'
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$root_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bank-rest-app
+    ports:
+      - '8080:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: 'jdbc:mysql://db:3306/bank_cards_db'
+      SPRING_DATASOURCE_USERNAME: 'springuser'
+      SPRING_DATASOURCE_PASSWORD: 'springpassword'
+      SPRING_JPA_HIBERNATE_DDL_AUTO: 'none'
+      SPRING_LIQUIBASE_ENABLED: 'true'
+      SPRING_LIQUIBASE_URL: 'jdbc:mysql://db:3306/bank_cards_db'
+      SPRING_LIQUIBASE_USER: 'springuser'
+      SPRING_LIQUIBASE_PASSWORD: 'springpassword'
+
+volumes:
+  db-data:

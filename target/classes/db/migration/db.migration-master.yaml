@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include:
+      file: db/migration/001-create-initial-tables.yaml
+  - include:
+      file: db/migration/002-create-admin-user.yaml
